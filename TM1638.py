@@ -78,7 +78,7 @@ class TM1638(object):
 	sleep(0.001)
 
         self.send_command(0x40)
-        self.send_command(0x80 | 8 | min(7, intensity))
+        self.send_command(0x8f | 8 | min(7, intensity))
 
         GPIO.output(self.stb, False)
 	sleep(0.001)
