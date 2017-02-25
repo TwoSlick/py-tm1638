@@ -61,46 +61,6 @@ class TM1638(object):
       ' ': 0b00000000
     }
 
-# FONT_2 = {
-#     '0': 0b00111111,
-#     '1': 0b00000110,
-# 	'2': 0b01011011,
-#     '3': 0b01001111,
-#     '4': 0b01100110,
-#     '5': 0b01101101,
-#     '6': 0b01111101,
-#     '7': 0b00000111,
-#     '8': 0b01111111,
-#     '9': 0b01101111,
-#     'a': 0b01110111,
-#     'b': 0b01111100,
-#     'c': 0b00111001,
-#     'd': 0b01011110,
-#     'e': 0b01111001,
-#     'f': 0b01110001,
-#     'g': 0b01101111,
-#     'h': 0b01110100,
-#     'i': 0b00110000,
-#     'j': 0b00001110,
-#     'k': 0b01110000,
-#     'l': 0b00111000,
-#     'm': 0b01010101,
-#     'n': 0b00110111,
-#     'o': 0b01011100,
-#     'p': 0b01110011,
-#     'q': 0b01100111,
-#     'r': 0b01010000,
-#     's': 0b01101101,
-#     't': 0b01111000,
-#     'u': 0b00111110,
-#     'v': 0b00011100,
-#     'w': 0b00011101,
-#     'x': 0b01110110,
-#     'y': 0b01101110,
-# 	'z': 0b00011011,
-# 	' ': 0b00000000
-# }
-
     def __init__(self, dio, clk, stb):
         self.dio = dio
         self.clk = clk
@@ -167,47 +127,27 @@ class TM1638(object):
     def get_bit_mask(self, pos, digit, bit):
         return ((self.FONT[digit] >> bit) & 1) << pos
 
-    def set_text(self, text):
-        dots = 0b00000000
-        pos = text.find('.')
-        posdot = 9
-        if pos != -1:
-            dots = dots | (128 >> pos+(8-len(text)))
-            text = text.replace('.', '')
-        posdot = 8 - len(text) + pos
-
-#        self.send_char(7, self.rotate_bits(dots))
-        text = text[0:8]
-        text = text[::-1]
+    def display_line(self, text, dot_indexes, print_forward=False):
+        text = text.upper()
         text += " "*(8-len(text))
-        for i in range(0, 8):
-            byte = 0b00000000;
-#            for pos in range(8):
-#                c = text[pos]
-#                if c == 'c':
-#                    byte = (byte | self.get_bit_mask(pos, c, i))
-#                elif c != ' ':
-#                    byte = (byte | self.get_bit_mask(pos, c, i))
-#            self.send_char(i, self.rotate_bits(byte))
-        if 8-i == posdot: 
-                self.send_char(7-i,self.FONT[text[i]] | 0b10000000)
-        else:
-                self.send_char(7-i,self.FONT[text[i]])
-
-    def display_line(self, char_list, dot_positions):
-        char_list = list(char_list)
-    
-        for i in range(0, 8 - len(char_list)):
-            char_list.append(" ")
         
-        for i in range(0, 8):
-            if dot_positions and dot_positions[i]:
-                self.send_char(i, self.FONT[char_list[i]] | 0b10000000)
+        start = 7
+        end = -1
+        increment = -1 
+        
+        if print_forward:
+            start = 0
+            end = 8
+            increment = 1
+        
+        for i in range(start, end, increment):
+            if i in dot_indexes:
+                self.send_char(i, self.FONT[text[i]] | 0b10000000)
             else:
-                self.send_char(i, self.FONT[char_list[i]])
-                
-    def scroll_text(self, text, clear_after=False):
-        buffer = list()
+                self.send_char(i, self.FONT[text[i]])
+    
+    def set_text(self, text, scrolling=False, print_forward=False):
+        buffer = ""
         dot_positions = list()
 
         pos = -1
@@ -215,17 +155,19 @@ class TM1638(object):
             if char == ".":
                 dot_positions[pos] = True
             else:
-                buffer.append(char)
+                buffer += char
                 dot_positions.append(False)
 
-        self.display_line(buffer[0 : 8], dot_positions[0 : 8])
+        end = len(buffer)-7
+        if not scrolling:
+            end = 1
 
-        for i in range(1, len(buffer)-7):
-            self.display_line(buffer[i : i+8], dot_positions[i : i+8])
-        
-        if clear_after:
-            self.display_line([], [])
-        
+        for i in range(0, end):
+            dot_indexes = set(i for i, v in enumerate(dot_positions[i : i+8]) if v)
+            self.display_line(buffer[i : i+8], dot_indexes, print_forward)
+
+    def scroll_text(self, text, print_forward=False):
+        self.set_text(text, scrolling=True, print_forward=print_forward)
 
     def receive(self):
         temp = 0
