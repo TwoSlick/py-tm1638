@@ -9,6 +9,7 @@
 
 import RPi.GPIO as GPIO
 from time import sleep
+import re
 
 GPIO.setwarnings(False) # suppresses warnings on RasPi
 
@@ -61,10 +62,11 @@ class TM1638(object):
       ' ': 0b00000000
     }
 
-    def __init__(self, dio, clk, stb):
+    def __init__(self, dio, clk, stb, sleep_time=0.001):
         self.dio = dio
         self.clk = clk
         self.stb = stb
+        self.sleep_time = sleep_time
 
     def enable(self, intensity=7):
         GPIO.setmode(GPIO.BCM)
@@ -73,46 +75,46 @@ class TM1638(object):
         GPIO.setup(self.stb, GPIO.OUT)
 
         GPIO.output(self.stb, True)
-        sleep(0.001)
+        sleep(self.sleep_time)
         GPIO.output(self.clk, True)
-        sleep(0.001)
+        sleep(self.sleep_time)
 
         self.send_command(0x40)
-        self.send_command(0x8f | 8 | min(7, intensity))
+        self.send_command(0x80 | 8 | min(7, intensity))
 
         GPIO.output(self.stb, False)
-        sleep(0.001)
+        sleep(self.sleep_time)
         self.send_byte(0xC0)
         for i in range(16):
             self.send_byte(0x00)
         GPIO.output(self.stb, True)
-        sleep(0.001)
+        sleep(self.sleep_time)
 
     def send_command(self, cmd):
         GPIO.output(self.stb, False)
-        sleep(0.001)
+        sleep(self.sleep_time)
         self.send_byte(cmd)
         GPIO.output(self.stb, True)
-        sleep(0.001)
+        sleep(self.sleep_time)
 
     def send_data(self, addr, data):
         self.send_command(0x44)
         GPIO.output(self.stb, False)
-        sleep(0.001)
+        sleep(self.sleep_time)
         self.send_byte(0xC0 | addr)
         self.send_byte(data)
         GPIO.output(self.stb, True)
-        sleep(0.001)
+        sleep(self.sleep_time)
 
     def send_byte(self, data):
         for i in range(8):
             GPIO.output(self.clk, False)
-            sleep(0.001)
+            sleep(self.sleep_time)
             GPIO.output(self.dio, (data & 1) == 1)
-            sleep(0.001)
+            sleep(self.sleep_time)
             data >>= 1
             GPIO.output(self.clk, True)
-            sleep(0.001)
+            sleep(self.sleep_time)
 
     def set_led(self, n, color):
         self.send_data((n << 1) + 1, color)
@@ -128,7 +130,6 @@ class TM1638(object):
         return ((self.FONT[digit] >> bit) & 1) << pos
 
     def display_line(self, text, dot_indexes, print_forward=False):
-        text = text.upper()
         text += " "*(8-len(text))
         
         start = 7
@@ -145,8 +146,16 @@ class TM1638(object):
                 self.send_char(i, self.FONT[text[i]] | 0b10000000)
             else:
                 self.send_char(i, self.FONT[text[i]])
-    
+
+    def remove_supported_characters(self, text):
+        supported_characters = "".join(self.FONT.keys())
+
+        return re.sub(r"[^" + supported_characters + "]", "", text)
+
     def set_text(self, text, scrolling=False, print_forward=False):
+        text = text.upper()
+        text = self.remove_supported_characters(text)
+        print text
         buffer = ""
         dot_positions = list()
 
