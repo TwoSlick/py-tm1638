@@ -36,7 +36,7 @@ class TM1638(object):
       'A': 0b01110111, # (65)   A
       'B': 0b01111111, # (66)   B
       'C': 0b00111001, # (67)   C
-      'D': 0b00111111, # (68)   D
+      'D': 0b01011110, # (68)   D
       'E': 0b01111001, # (69)   E
       'F': 0b01110001, # (70)   F
       'G': 0b00111101, # (71)   G
@@ -134,8 +134,8 @@ class TM1638(object):
         
         start = 7
         end = -1
-        increment = -1 
-        
+        increment = -1
+
         if print_forward:
             start = 0
             end = 8
@@ -147,15 +147,14 @@ class TM1638(object):
             else:
                 self.send_char(i, self.FONT[text[i]])
 
-    def remove_supported_characters(self, text):
+    def remove_unsupported_characters(self, text):
         supported_characters = "".join(self.FONT.keys())
 
         return re.sub(r"[^" + supported_characters + "]", "", text)
 
     def set_text(self, text, scrolling=False, print_forward=False):
         text = text.upper()
-        text = self.remove_supported_characters(text)
-        print text
+        text = self.remove_unsupported_characters(text)
         buffer = ""
         dot_positions = list()
 
@@ -168,7 +167,7 @@ class TM1638(object):
                 dot_positions.append(False)
 
         end = len(buffer)-7
-        if not scrolling:
+        if not scrolling or end < 1:
             end = 1
 
         for i in range(0, end):
